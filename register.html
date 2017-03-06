@@ -1,0 +1,210 @@
+<!DOCTYPE HTML>
+<html>
+
+<head>
+	<meta charset="utf-8">
+	<title>用户注册 - WitPM</title>
+	<meta charset="utf-8">
+	<meta name="renderer" content="webkit|ie-comp|ie-stand">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge">
+	<meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=1.0,maximum-scale=1.0,user-scalable=no" />
+	<link href="./css/main.css" rel="stylesheet" type="text/css" />
+</head>
+
+<body>
+	<div id="canvasDiv" style="position:absolute;z-index:1000"></div>
+	<div class="header">
+		<div class="wp cl">
+			<span class="r loginBar f14">
+          	已有账户，<a class="c-main" href="http://www.witpm.com/">马上登录</a>
+      		<span class="pipe">|</span>
+			<a class="c-main" href="http://www.witpm.com/">返回witpm</a>
+			</span>
+		</div>
+	</div>
+	<div class="wp mainWraper box_shadow">
+		<div class="formWraper">
+			<form action="/reg_commit.do" method="post" class="Huiform UCform" name="frmLogin" onsubmit="return beforesub();">
+				<input type="hidden" name="appId" value="1006" />
+				<input type="hidden" name="third" value="" />
+				<input type="hidden" name="userId" value="" />
+				<input type="hidden" name="thirdId" value="" />
+				<input type="hidden" name="regFrom" value="1006" />
+				<input type="hidden" id="regkey" name="regkey" value="ZU0xaEJGYVVObGFPWUZCMkRTd2hJS1ZuQnNEMDRkWUcwOFpTUXFROHFveUFlUUJueWppOVR3PT0%2F%0Aa2V5SWQ9MQ%3D%3D"
+				/>
+				<input type="hidden" name="cback" value="" />
+				<div class="maintitle">注 册 WitPM</div>
+				<div style="padding-left:230px;padding-top:40px">
+					<p class="c-red"></p>
+					<div class="formRow">
+						<div class="formControls">
+							<input class="input_text radius" type="text" name="email" id="email" value="" ajaxurl="exists.do" autocomplete="off" placeholder="邮箱|手机"
+							 tabindex="1" datatype="m|e" nullmsg="请输入常用邮箱或中国大陆手机！" sucmsg="验证通过">
+						</div>
+					</div>
+					<div class="formRow">
+						<div class="formControls">
+							<input name="username" id="username" value="" ajaxurl="exists_username.do" class="input_text radius" type="text" autocomplete="off"
+							 placeholder="用户名，4~16个字符，字母/中文/数字/下划线" tabindex="2" datatype="*" nullmsg="请输入用户名" sucmsg="验证通过">
+							<!--<span class="Validform_checktip Validform_warning">用户名是您在witpm的唯一名称</span>-->
+						</div>
+					</div>
+					<div class="formRow">
+						<div class="formControls">
+							<input name="password" id="password" class="input_text radius" type="password" autocomplete="off" placeholder="设置密码" tabindex="3"
+							 datatype="*6-20" plugin="passwordStrength" nullmsg="请设置您的通行证登录密码！" errormsg="6~20个字符，区分大小写！">
+							<input id="IEpassword" class="input_text IE8paw radius" type="text" value="设置密码" style="display:none">
+							<span class="passwordStrength" style="display:none;margin-left:25px;"><span>弱</span><span>中</span><span class="last">强</span></span>
+							<span class="Validform_checktip"></span>
+						</div>
+					</div>
+					<div class="formRow">
+						<div class="formControls">
+							<input name="password2" id="password2" class="input_text radius" type="password" autocomplete="off" placeholder="确认密码" tabindex="4"
+							 datatype="*" recheck="password" nullmsg="请再输入一次密码！" errormsg="您两次输入的密码不一致！">
+							<input id="IEpassword2" class="input_text IE8paw radius" type="text" value="设置密码" style="display:none">
+						</div>
+					</div>
+					<div class="formRow" id="emailVerify">
+						<div id="VaptchaPoz">
+							<span>验证码加载中...</span>
+						</div>
+						<div class="formControls">
+							<div id="div_id_embed2" style="margin-left:120px;"></div>
+						</div>
+						<div id="canvasDiv"></div>
+					</div>
+
+					<div class="formRow" id="phoneVerify" style="display:none;">
+						<div class="formControls" style="width:350px;">
+							<input id="phoneCodeInput" style="width:300px;" name="phoneCode" ajaxurl="checkPhoneCode.do?phoneNum=" class="input_text radius"
+							 type="text" autocomplete="off" placeholder="验证码" tabindex="5" datatype="*" nullmsg="请输入验证码" errormsg="验证码不正确">
+							<button id="verifyCodeSendBtn" class="verifyCodeSend btn btn-mid" type="button">发送验证码</button>
+							<span class="Validform_checktip" style="line-height: 30px;position: absolute;width: 200px;margin-left: 210px;margin-top: 12px;"></span>
+						</div>
+					</div>
+
+					<div class="formRow f14 c-666">
+						<input type="checkbox" tabindex="5" autocomplete="off" id="isAgree" name="isAgree" datatype="*" nullmsg="请勾选"> 我已阅读并接受
+						<a class="c-main" href="http://www.witpm.com/copyright.html" target="_blank">版权声明</a> 和
+						<a class="c-main" href="http://www.witpm.com/privacy.html" target="_blank">隐私保护</a> 条款</div>
+
+					<div class="formRow" id="regBtn">
+						<button class="disabled btn btn-block btn-large" type="submit" tabindex="6" disabled="disabled">马上注册</button>
+					</div>
+				</div>
+			</form>
+		</div>
+	</div>
+	<script type="text/javascript" src="scripts/vaptcha-sdk.js"></script>
+	<script type="text/javascript" src="scripts/test.js"></script>
+	<script>
+		vaptcha.whenDocumentReady(function () {
+			vaptcha.init();
+		});
+		// function beforesub() {
+		// 	if ($('#div_id_embed2').html().length == 0) {
+		// 		alert('验证码未加载完成，请刷新页面重新加载');
+		// 		return false;
+		// 	}
+		// }
+		// $().ready(function () {
+		// 	function loadRandomCode() {
+		// 		$('#randomCodeImg').attr('src', 'http://passport.zcool.com.cn/loginRandomImg.jpg?t=' + new Date().getTime());
+		// 	}
+		// 	//loadRandomCode();
+		// 	var wait = 60;
+		// 	$('#email').bind('blur', function () {
+		// 		$('#phoneCodeInput').attr('ajaxurl', 'checkPhoneCode.do?phoneNum=' + $('#email').val());
+		// 	});
+		// 	function verifyCodeSend() {
+		// 		if ($('#email').val() != '' && !$('#email').hasClass('Validform_error')) {
+		// 			$.ajax({
+		// 				url: 'http://passport.zcool.com.cn/phoneSendcode.do?TOKEN=' + $('#regkey').val(),
+		// 				data: { phoneNum: $('#email').val(), geetest_challenge: gt_captcha_obj2.getValidate().geetest_challenge, geetest_validate: gt_captcha_obj2.getValidate().geetest_validate, geetest_seccode: gt_captcha_obj2.getValidate().geetest_seccode },
+		// 				dataType: 'json',
+		// 				success: function (data) {
+		// 					if (!data.result) {
+		// 						alert(data.msg);
+		// 						window.location.reload();
+		// 					} else {
+		// 						$('#phoneVerify .Validform_checktip').removeClass('Validform_wrong').html('发送成功,请在30分钟内完成验证');
+		// 					}
+		// 				},
+		// 				error: function (data) {
+		// 					console.log("手机验证码发送异常");
+		// 				},
+		// 			});
+		// 			waitTime($('.verifyCodeSend'));
+		// 		} else {
+		// 			alert("手机号填写错误");
+		// 		}
+		// 	}
+		// 	function waitTime(o) {
+		// 		if (wait == 0) {
+		// 			$(o).removeAttr('disabled');
+		// 			$(o).html('发送验证码');
+		// 			wait = 60;
+		// 		} else {
+		// 			$(o).prop('disabled', true);
+		// 			$(o).attr('disabled', 'disabled');
+		// 			$(o).html("重新发送(" + wait + ")");
+		// 			wait--;
+		// 			setTimeout(function () { waitTime(o) }, 1000);
+		// 		}
+		// 	}
+
+		// 	//验证插件
+		// 	// get geetest server status, use the failback solution
+		// 	var loadGeetest2 = function (config) {
+		// 		// 1. use geetest capthca
+		// 		window.gt_captcha_obj2 = new window.Geetest({
+		// 			gt: config.gt,
+		// 			challenge: config.challenge,
+		// 			product: 'popup',
+		// 			offline: !config.success
+		// 		}).appendTo('#verifyCodeSendBtn').bindOn('#verifyCodeSendBtn');
+		// 		//gt_captcha_obj.appendTo("#div_id_embed");
+		// 		// Ajax request demo,if you use submit form ,then ignore it
+		// 		gt_captcha_obj2.onSuccess(function () {
+		// 			verifyCodeSend();
+		// 		});
+		// 	}
+
+		// 	var loadGeetest = function (config) {
+		// 		// 1. use geetest capthca
+		// 		window.gt_captcha_obj = new window.Geetest({
+		// 			gt: config.gt,
+		// 			challenge: config.challenge,
+		// 			product: 'embed',
+		// 			offline: !config.success
+		// 		});
+		// 		$('#emailVerify span').html('');
+		// 		gt_captcha_obj.appendTo("#div_id_embed2");
+		// 		$('#regBtn button').removeClass('disabled').addClass('btn-success').removeAttr('disabled');
+		// 		// Ajax request demo,if you use submit form ,then ignore it
+		// 		gt_captcha_obj.onSuccess(function () {
+		// 		});
+		// 	}
+
+		// 	$.ajax({
+		// 		url: "http://passport.zcool.com.cn/StartCapthcaServlet?t=" + new Date().getTime(),
+		// 		type: "get",
+		// 		dataType: 'JSON',
+		// 		success: function (result) {
+		// 			loadGeetest(result);
+		// 		}
+		// 	})
+		// 	$.ajax({
+		// 		url: "http://passport.zcool.com.cn/StartCapthcaServlet?t=" + new Date().getTime(),
+		// 		type: "get",
+		// 		dataType: 'JSON',
+		// 		success: function (result) {
+		// 			loadGeetest2(result);
+		// 		}
+		// 	})
+		// });
+	</script>
+</body>
+
+</html>
