@@ -99,9 +99,10 @@
 	<script type="text/javascript" src="scripts/vaptcha-sdk.js"></script>
 	<script type="text/javascript" src="scripts/test.js"></script>
 	<script>
-		vaptcha.whenDocumentReady(function () {
+		window.onload = function () {
 			vaptcha.init();
-		});
+			vaptcha.getVaptcha("123456",()=>{});
+		};
 		// function beforesub() {
 		// 	if ($('#div_id_embed2').html().length == 0) {
 		// 		alert('验证码未加载完成，请刷新页面重新加载');
