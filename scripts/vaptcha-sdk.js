@@ -9,7 +9,7 @@
     var vaptcha,
         challenge,
         siteId,
-        vaptchaUrl = "api.vaptcha.com",
+        vaptchaUrl = "http://api.vaptcha.com",
         requestAmount = 0,
         validateCallback = new Function(),
         getImgCallback = new Function(),
@@ -244,7 +244,7 @@
                 angle = 360 - Math.atan((-y) / x) * 180 / Math.PI; //四象限
             }
         }
-        //二,三象限
+            //二,三象限
         else if (x < 0) {
             if (y == 0) {
                 angle = 180;
@@ -256,7 +256,7 @@
                 angle = Math.atan(y / x) * 180 / Math.PI + 180; //三象限
             }
         }
-        //x === 0
+            //x === 0
         else {
             if (y > 0) {
                 //90度
@@ -627,7 +627,7 @@
                         n = (n > 0 || -1) * Math.floor(Math.abs(n));
                     }
                 }
-                for (k = n >= 0 ? Math.min(n, len - 1) : len - Math.abs(n); k >= 0; k--) {
+                for (k = n >= 0 ? Math.min(n, len - 1) : len - Math.abs(n) ; k >= 0; k--) {
                     if (k in t && t[k] === searchElement) {
                         return k;
                     }
@@ -1838,7 +1838,11 @@
                 //for ie test
                 _calculateCharacteristic(dragSpotData);
                 if (_analysisAngle() && _analysisAcceleration()) {
-                    _sendData(data);
+                    _validateVaptcha({
+                        "v": data,
+                        "siteid": siteId,
+                        "challenge": challenge,
+                    });
                 }
                 _removeCanvas();
                 //性能检测：
@@ -1853,6 +1857,7 @@
             var VaptchaNav = document.getElementById("vaptchaNavDiv");
             VaptchaNav.style.display = "block";
         })
+
         _eventHandler(VaptchaDiv, "mouseout", function (e) {
             var VaptchaNav = document.getElementById("vaptchaNavDiv");
             VaptchaNav.style.display = "none";
@@ -1875,7 +1880,7 @@
             } else {
                 _setCookie("VaptchInterval", VaptchInterval, new Data(VaptchInitTime), "", "vaptcha.com");
                 _setCookie("VaptchTime", new Date().getTime(), new Data(VaptchInitTime), "", "vaptcha.com");
-                _getVaptha(challenge,siteId, fn);
+                _refreshVaptha(challenge, fn);
             }
         })
 
@@ -1885,23 +1890,12 @@
     }
 
     /*与vaptcha服务器交互*/
-    //todo 改为jsonp发送，加入vaptcha的真实地址 发送给服务器
-    function _sendData(data) {
-        var xhr = _createXHR()
-        xhr.onreadystatechange = function () {
-            if (xhr.readyState == 4) {
-                if ((xhr.status >= 200 && xhr.status < 300) || xhr.status == 304) {
-                    validateCallback(responseText = xhr.responseText);
-                    var img = document.getElementById('vaptchaCoverImg');
-                    span.innerHTML = xhr.responseText;
-                    img.appendChild(span);
-                } else {
-                    console.error("请求失败: " + xhr.status);
-                }
-            }
-        }
-        xhr.open("get", "./Home/VerifyVapthca?v=" + data + "&time=" + new Date().getTime(), true);
-        xhr.send(null);
+    //向Vaptcha验证数据
+    function _validateVaptcha(data) {
+        //vaptchaUrl + "/refresh?callback=Vaptcha" + new Date().getTime()
+        _getJsonp("./Home/validate?callback=Vaptcha" + new Date().getTime(), data, "callback", function (result) {
+            console.log(result);
+        })
     }
     //生成Vaptcha验证图片
     function _generateVaptchaImg(data) {
@@ -1934,14 +1928,41 @@
     }
     //向Vaptcha请求图片
     function _getVaptha(challengeParam, siteIdParam, fn) {
-        challenge = challengeParam;
         requestAmount += 1;
         getImgCallback = fn;
         challenge = challengeParam;
         siteId = siteIdParam;
-        //vaptchaUrl + "/GetImageUrl?callback=Vaptcha" + _newGuid()
-        _getJsonp("./Home/GetImageUrl?callback=Vaptcha" + new Date().getTime(), { "challenge": challengeParam, "siteId": siteIdParam }, "callback", function (data) {
+        //vaptchaUrl + "/get?callback=Vaptcha" + new Date().getTime()
+        _getJsonp(vaptchaUrl + "/get?callback=Vaptcha" + new Date().getTime(), { "challenge": challengeParam, "siteId": siteIdParam }, "callback", function (data) {
             //todo show img 或者 接收客户自定义function回调
+            switch (data.code) {
+                case 1: alert("访问被拒绝");
+                    break;
+                case 2: alert("请刷新页面重试");
+                    break;
+                case 3: _generateVaptchaImg(data.data);
+                    _addEventHandler();
+                    if (typeof getImgCallback == "function") {
+                        getImgCallback(data);
+                    }
+                    break;
+                case 4: alert("请求失败");
+                    break;
+                case 5: alser("刷新太快");
+                    break;
+                case 6: alser("刷新太频繁");
+                    break;
+                case 7: alser("绘制太频繁");
+                    break;
+            }
+
+        })
+    }
+    //向Vaptcha刷新图片
+    function _refreshVaptha(challengeParam, siteIdParam) {
+        requestAmount += 1;
+        //vaptchaUrl + "/refresh?callback=Vaptcha" + new Date().getTime()
+        _getJsonp(vaptchaUrl + "/refresh?callback=Vaptcha" + new Date().getTime(), { "challenge": challengeParam, "siteId": siteIdParam }, "callback", function (data) {
             _generateVaptchaImg({
                 width: "500px",
                 height: "400px",
@@ -1954,6 +1975,7 @@
             }
         })
     }
+
 
     /*外部接口对象*/
     vaptcha = {
