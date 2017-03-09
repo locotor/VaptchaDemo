@@ -9,11 +9,18 @@
     var vaptcha,
         challenge,
         siteId,
-        vaptchaUrl = "http://api.vaptcha.com",
+        VaptchaInterval,
+        VaptchTime,
+        VaptchaInitTime,
+        VaptchaData,
+        interval,
+        vaptchaUrl = "http://api.vaptcha.com/",
+        imgUrl = "http://static.vaptcha.com/",
         requestAmount = 0,
         validateCallback = new Function(),
         getImgCallback = new Function(),
         vaptchaCanvasDiv,
+        vaptchaMessageDiv,
         canvas,
         context,
         canvasWidth,
@@ -166,6 +173,13 @@
         if ((now - startTime) > 5000) {
             return true;
         }
+    };
+    //插入style标签
+    function _insertStyle(styleText) {
+        var head = document.getElementsByTagName('head')[0];
+        var style = document.createElement('style');
+        style.innerText = styleText;
+        head.appendChild(style);
     }
     //存取cookie值
     function _getCookie(name) {
@@ -200,16 +214,8 @@
     function _unSetCookie(name, path, domain, secure) {
         _setCookie.set(name, "", new Date(0), path, demain, secure);
     }
-    function _newGuid() {
-        let guid = "";
-        for (let i = 1; i <= 32; i++) {
-            let n = Math.floor(Math.random() * 16.0).toString(16);
-            guid += n;
-            if ((i == 8) || (i == 12) || (i == 16) || (i == 20))
-                guid += "-";
-        }
-        return guid;
-    }
+
+
 
     /*数据验证编码*/
     //检测两点之间的距离,大于指定值才加入采样数列中
@@ -1852,146 +1858,196 @@
         })
 
         //鼠标hover
-        var VaptchaDiv = document.getElementById("VaptchaPoz");
-        _eventHandler(VaptchaDiv, "mouseover", function (e) {
-            var VaptchaNav = document.getElementById("vaptchaNavDiv");
-            VaptchaNav.style.display = "block";
-        })
-
-        _eventHandler(VaptchaDiv, "mouseout", function (e) {
-            var VaptchaNav = document.getElementById("vaptchaNavDiv");
-            VaptchaNav.style.display = "none";
-        })
+        var vaptchaPoz = document.getElementById("vaptchaPoz");
+         var VaptchaOpt = document.getElementById("vaptchaOpt");
+         _eventHandler(vaptchaPoz, "mouseover", function (e) {
+             VaptchaOpt.style.display = "block";
+         })
+         _eventHandler(vaptchaPoz, "mouseout", function (e) {
+             VaptchaOpt.style.display = "none";
+         })
 
         //刷新
         var VaptchaRefresh = document.getElementById("vaptchaRefresh");
-        _eventHandler(VaptchaRefresh, "click", function (e) {
-            var VaptchInterval = _getCookie("VaptchInterval");
-            var VaptchTime = _getCookie("VaptchTime");
-            var VaptchInitTime = _getCookie("VaptchInitTime");
-            VaptchInterval += (1 / (new Date().getTime() - VaptchTime));
+        if (VaptchaRefresh) {
+            _eventHandler(VaptchaRefresh, "click", function (e) {
+                if ((new Date().getTime() - VaptchaInitTime) < 180000) {
+                    VaptchaInterval += (1 / (new Date().getTime() - VaptchTime));
+                } else {
+                    VaptchaInterval = 0;
+                    VaptchaInitTime = new Date().getTime()
+                }
+                VaptchaTime = new Date().getTime();
 
-            if (this.challenge && this.challenge.toString().length) {
-                alert("challenge不能为空");
-            } else if (this.requestAmount >= 5) {
-                alert("操作太频繁,请刷新页面重试");
-            } else if (VaptchInterval > 10) {
-                alert("操作太频繁,请刷新页面重试");
-            } else {
-                _setCookie("VaptchInterval", VaptchInterval, new Data(VaptchInitTime), "", "vaptcha.com");
-                _setCookie("VaptchTime", new Date().getTime(), new Data(VaptchInitTime), "", "vaptcha.com");
-                _refreshVaptha(challenge, fn);
-            }
-        })
+                if (this.challenge && this.challenge.toString().length) {
+                    alert("challenge不能为空");
+                } else if (this.requestAmount >= 5) {
+                    alert("操作太频繁,请刷新页面重试");
+                } else if (VaptchaInterval > 10) {
+                    alert("操作太频繁,请刷新页面重试");
+                } else {
+                    _refreshVaptcha(challenge, siteId);
+                }
+            })
+        }
 
         //鼠标左键图标点击事件
         // $(document).on('click', '#drewByLeft', function (event) {
         // });
     }
+    //触发事件
+    function _fireEvent(eventType, event, target) {
+        if (document.createEvent) {
+            var event = document.createEvent(eventType);
+            event.initEvent(event, true, true);
+            target.dispatchEvent(event);
+        } else if (document.createEventObject) {
+            target.fireEvent("on" + event);
+        }
+    }
 
     /*与vaptcha服务器交互*/
+
+    function _detectResponse(data) {
+        if (vaptchaMessageDiv) {
+            switch (data.code) {
+                case 1: vaptchaMessageDiv.innerHTML = "访问被拒绝";
+                    return false;
+                case 2: vaptchaMessageDiv.innerHTML = "请刷新页面重试";
+                    var refreshObj = document.getElementById("VaptchaRefresh");
+                    _fireEvent("MouseEvents", "click", refreshObj);
+                    return false;
+                case 4: vaptchaMessageDiv.innerHTML = "请求失败";
+                    return false;
+                case 5: vaptchaMessageDiv.innerHTML = "刷新太快";
+                    return false;
+                case 6: vaptchaMessageDiv.innerHTML = "刷新太频繁";
+                    return false;
+                case 7: vaptchaMessageDiv.innerHTML = "绘制太频繁";
+                    var refreshObj = document.getElementById("VaptchaRefresh");
+                    _fireEvent("MouseEvents", "click", refreshObj);
+                    return false;
+                default:
+                    return true;
+            }
+        } else {
+            //todo 在poz后面append一个
+        }
+    }
     //向Vaptcha验证数据
     function _validateVaptcha(data) {
-        //vaptchaUrl + "/refresh?callback=Vaptcha" + new Date().getTime()
-        _getJsonp("./Home/validate?callback=Vaptcha" + new Date().getTime(), data, "callback", function (result) {
-            console.log(result);
+        //vaptchaUrl + "vaptcha?callback=Vaptcha" + new Date().getTime()
+        _getJsonp(vaptchaUrl + "validate?callback=Vaptcha" + new Date().getTime(), data, "callback", function (result) {
+            if (_detectResponse) {
+                var img = document.getElementById("vaptchaImg")
+                img.setAttribute("src", imgUrl + VaptchaData.coverimg);
+            }
         })
     }
-    //生成Vaptcha验证图片
+    //生成Vaptcha图片
     function _generateVaptchaImg(data) {
         var fragment = document.createDocumentFragment();
 
         var navDiv = document.createElement("div");
         navDiv.setAttribute("id", "vaptchaNavDiv");
-        navDiv.style.display = "none";
-        navDiv.innerHTML = "<img src='//www.baidu.com/img/baidu_jgylogo3.gif'><div id='vaptchaLeftClickDiv'>左键点击</div><div id='vaptchaRightClickDiv'>右键点击</div><div id='vaptchaRefresh'>刷新</div>"
+        navDiv.innerHTML = "<div class=\"vaptcha\">\n<div class=\"vaptcha-main\">\n<img id='vaptchaImg' src=" + imgUrl + data.img + ">" +
+        "<div id=\"vaptchaOpt\" class=\"opt\">\n<div class=\"logo-main\">\n<div class=\"vaptcha-logo\"></div>\n<span>aptcha</span>\n</div>\n<a id=\"vaptchaRefresh\" class=\"reload\">\n<i class=\"refresh\"></i>\n</a>\n<div class=\"draw\">\n<a class=\"pencil\"></a>\n<span>or</span>\n<a class=\"mouse\"><img src=\"http://static.vaptcha.com/mouse.gif\" /></a>\n</div>\n</div><div id=\"vaptchaMessage\"></div>\n</div>\n</div>";
+
         fragment.appendChild(navDiv);
-
-
-        var img = document.createElement("img");
-        img.setAttribute("src", data.img);
-        fragment.appendChild(img);
 
         var TempCanvasDiv = document.createElement("div");
         TempCanvasDiv.setAttribute("id", "vaptchaCanvasDiv");
         fragment.appendChild(TempCanvasDiv);
 
-        var ValidateImg = document.createElement("img");
-        ValidateImg.setAttribute("src", data.coverimg);
-        ValidateImg.setAttribute("id", "vaptchaCoverImg")
-        ValidateImg.style.cssText = "display:none";
-        fragment.appendChild(ValidateImg);
+        var styleText = "@charset \"UTF-8\";\nbody {\n\tfont-family: \"Microsoft YaHei\", \u5FAE\u8F6F\u96C5\u9ED1, \"MicrosoftJhengHei\", \u534E\u6587\u7EC6\u9ED1, STHeiti, MingLiu;\n}\n\n.vaptcha {\n\twidth: 378px;\n}\n\n.vaptcha .vaptcha-main {\n\twidth: 100%;\n\theight: 172px;\n  position: relative;\n}\n\n.vaptcha .vaptcha-main .opt {\n display:none; width: 100%;\n\theight: 30px;\n\tbackground: rgba(255, 255, 255, 0.9);\n\tpadding: 0 6px;\n\tline-height: 30px;\n\toverflow: hidden;\n  position: absolute;\n  top: 0;\n      box-sizing: border-box;\n\t  -moz-box-sizing: border-box;\n\t  -webkit-box-sizing:border-box;\n}\n\n.vaptcha .vaptcha-main .opt a:hover {\n\tcursor: pointer;\n}\n\n.vaptcha .vaptcha-main .opt .logo-main {\n\tfloat: left;\n\tfont-size: 14px;\n}\n\n.vaptcha .vaptcha-main .opt .logo-main .vaptcha-logo {\n\tdisplay: inline-block;\n\twidth: 14px;\n\theight: 16px;\n\tbackground: url(http://static.vaptcha.com/validate.png) 0 0px no-repeat;\n}\n\n.vaptcha .vaptcha-main .opt .logo-main span {\n\tmargin-left: -4px;\n}\n\n.vaptcha .vaptcha-main .opt .reload {\n\tfloat: right;\n}\n\n.vaptcha .vaptcha-main .opt .reload .refresh {\n\tdisplay: inline-block;\n\twidth: 16px;\n\theight: 16px;\n\tbackground: url(http://static.vaptcha.com/validate.png) no-repeat;\n\tbackground-position: 0 -57px;\n}\n\n.vaptcha .vaptcha-main .opt .reload .refresh:hover {\n\tbackground-position: 0 -73px;\n}\n\n.vaptcha .vaptcha-main .opt .draw {\n\twidth: 200px;\n\tmargin: 0 auto;\n\ttext-align: center;\n}\n\n.vaptcha .vaptcha-main .opt .draw .pencil {\n\tdisplay: inline-block;\n\twidth: 16px;\n\theight: 16px;\n\tbackground: url(http://static.vaptcha.com/validate.png) no-repeat;\n\tbackground-position: 0 -19px;\n}\n\n.vaptcha .vaptcha-main .opt .draw .pencil:hover {\n\tbackground-position: 0 -38px;\n}\n\n.vaptcha .vaptcha-main .opt .draw span {\n\tfont-size: 14px;\n\tcolor: #aaa;\n\tmargin: 0 10px;\n}\n\n.vaptcha .vaptcha-main .opt .draw .mouse img {\n\tvertical-align: text-bottom;\n}\n\n/*# sourceMappingURL=vaptcha.css.map */";
+        _insertStyle(styleText)
 
-        var poz = document.getElementById("VaptchaPoz");
+
+        var poz = document.getElementById("vaptchaPoz");
         poz.innerHTML = "";
         poz.appendChild(fragment);
     }
     //向Vaptcha请求图片
-    function _getVaptha(challengeParam, siteIdParam, fn) {
+    function _getVaptcha(challengeParam, siteIdParam, fn) {
         requestAmount += 1;
         getImgCallback = fn;
         challenge = challengeParam;
         siteId = siteIdParam;
         //vaptchaUrl + "/get?callback=Vaptcha" + new Date().getTime()
-        _getJsonp(vaptchaUrl + "/get?callback=Vaptcha" + new Date().getTime(), { "challenge": challengeParam, "siteId": siteIdParam }, "callback", function (data) {
+        _getJsonp(vaptchaUrl + "get?callback=Vaptcha" + new Date().getTime(), { "challenge": challengeParam, "siteId": siteIdParam }, "callback", function (data) {
             //todo show img 或者 接收客户自定义function回调
-            switch (data.code) {
-                case 1: alert("访问被拒绝");
-                    break;
-                case 2: alert("请刷新页面重试");
-                    break;
-                case 3: _generateVaptchaImg(data.data);
-                    _addEventHandler();
-                    if (typeof getImgCallback == "function") {
-                        getImgCallback(data);
-                    }
-                    break;
-                case 4: alert("请求失败");
-                    break;
-                case 5: alser("刷新太快");
-                    break;
-                case 6: alser("刷新太频繁");
-                    break;
-                case 7: alser("绘制太频繁");
-                    break;
+            if (_detectResponse(data)) {
+                VaptchaData = data;
+                _generateVaptchaImg(data);
+                _addEventHandler();
+                //_refreshVaptchaOvertime();
+                if (typeof getImgCallback == "function") {
+                    getImgCallback(data);
+                }
             }
-
         })
     }
     //向Vaptcha刷新图片
-    function _refreshVaptha(challengeParam, siteIdParam) {
+    function _refreshVaptcha(challengeParam, siteIdParam) {
         requestAmount += 1;
         //vaptchaUrl + "/refresh?callback=Vaptcha" + new Date().getTime()
-        _getJsonp(vaptchaUrl + "/refresh?callback=Vaptcha" + new Date().getTime(), { "challenge": challengeParam, "siteId": siteIdParam }, "callback", function (data) {
-            _generateVaptchaImg({
-                width: "500px",
-                height: "400px",
-                coverimg: "https://ss0.bdstatic.com/5aV1bjqh_Q23odCf/static/superman/img/logo/logo_white.png",
-                img: "https://ss0.bdstatic.com/5aV1bjqh_Q23odCf/static/superman/img/logo/logo_white.png"
-            });
-            _addEventHandler();
-            if (typeof getImgCallback == "function") {
-                getImgCallback(data);
+        _getJsonp(vaptchaUrl + "refresh?callback=Vaptcha" + new Date().getTime(), { "challenge": challengeParam, "siteId": siteIdParam }, "callback", function (data) {
+            if (_detectResponse(data)) {
+                VaptchaData = data;
+                var img = document.getElementById("vaptchaImg")
+                img.setAttribute("src", imgUrl + VaptchaData.img);
+                if (typeof getImgCallback == "function") {
+                    getImgCallback(data);
+                }
             }
         })
     }
-
+    //超时自动刷新页面
+    function _refreshVaptchaOvertime() {
+        var refreshObj = document.getElementById("vaptchaRefresh");
+        if (refreshObj) {
+            if (requestAmount > 10 || VaptchaInterval > 5) {
+                window.clearInterval(interval);
+            } else {
+                interval = window.setInterval(function () { _fireEvent('MouseEvents', 'click', refreshObj) }, 5000)
+            }
+        }
+    }
 
     /*外部接口对象*/
     vaptcha = {
         init: function (fn) {
             _H5SupportTest();
             _polyfill();
-            validateCallback = fn
+            validateCallback = fn;
+            vaptchaMessageDiv = document.getElementById("vaptchaMessage");
+            var showVaptcha = document.getElementById("VaptchaShow");
+            _eventHandler(showVaptcha, "click", function () {
+                var xhr = new XMLHttpRequest();
+                xhr.onreadystatechange = function () {
+                    if (xhr.readyState == 4) {
+                        if ((xhr.status >= 200 && xhr.status < 300) || xhr.status == 304) {
+                            var data = JSON.parse(xhr.response);
+                            console.log(xhr.responseText);
+                            vaptcha.getVaptcha(data.challenge, data.siteid, () => { });
+                        } else {
+                            console.error("Request was unsuccessful:" + xhr.status);
+                        }
+                    }
+                }
+                xhr.open("get", "./Home/GetCaptcha", true);
+                xhr.send(null);
+            });
         },
         getVaptcha: function (challenge, siteId, fn) {
             if (challenge && challenge.toString().length) {
-                var time = new Date().getTime;
-                time += 180000;
-                _setCookie("VaptchInterval", 0, new Date(time), "", "vaptcha.com");
-                _setCookie("VaptchTime", new Date().getTime(), new Date(time), "", "vaptcha.com");
-                _setCookie("VaptchInitTime", time, new Date(time), "", "vaptcha.com")
-                _getVaptha(challenge, siteId, fn);
+                VaptchaInitTime = new Date().getTime;
+                VaptchaTime = new Date().getTime();
+                VaptchaInterval = 0;
+
+                _setCookie("VaptchaInitTime", VaptchaInitTime, new Date(VaptchaInitTime + 180000), "", vaptchaUrl, false);
+
+                _getVaptcha(challenge, siteId, fn);
             } else {
                 alert("challenge不能为空");
             }
