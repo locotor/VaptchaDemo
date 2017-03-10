@@ -143,12 +143,14 @@
     }
     //事件处理函数绑定方法
     function _eventHandler(target, eventType, handler) {
-        if (target.addEventListener) {
-            target.addEventListener(eventType, handler, false);
-        } else if (target.attachEvent) {
-            target.attachEvent("on" + eventType, handler);
-        } else {
-            target["on" + eventType] = handler;
+        if (target) {
+            if (target.addEventListener) {
+                target.addEventListener(eventType, handler, false);
+            } else if (target.attachEvent) {
+                target.attachEvent("on" + eventType, handler);
+            } else {
+                target["on" + eventType] = handler;
+            }
         }
     }
     //阻止默认行为
@@ -1859,13 +1861,13 @@
 
         //鼠标hover
         var vaptchaPoz = document.getElementById("vaptchaPoz");
-         var VaptchaOpt = document.getElementById("vaptchaOpt");
-         _eventHandler(vaptchaPoz, "mouseover", function (e) {
-             VaptchaOpt.style.display = "block";
-         })
-         _eventHandler(vaptchaPoz, "mouseout", function (e) {
-             VaptchaOpt.style.display = "none";
-         })
+        var VaptchaOpt = document.getElementById("vaptchaOpt");
+        _eventHandler(vaptchaPoz, "mouseover", function (e) {
+            VaptchaOpt.style.display = "block";
+        })
+        _eventHandler(vaptchaPoz, "mouseout", function (e) {
+            VaptchaOpt.style.display = "none";
+        })
 
         //刷新
         var VaptchaRefresh = document.getElementById("vaptchaRefresh");
@@ -1897,12 +1899,14 @@
     }
     //触发事件
     function _fireEvent(eventType, event, target) {
-        if (document.createEvent) {
-            var event = document.createEvent(eventType);
-            event.initEvent(event, true, true);
-            target.dispatchEvent(event);
-        } else if (document.createEventObject) {
-            target.fireEvent("on" + event);
+        if (target) {
+            if (document.createEvent) {
+                var eventInstance = document.createEvent(eventType);
+                eventInstance.initEvent(event, true, true);
+                target.dispatchEvent(eventInstance);
+            } else if (document.createEventObject) {
+                target.fireEvent("on" + event);
+            }
         }
     }
 
@@ -1915,7 +1919,9 @@
                     return false;
                 case 2: vaptchaMessageDiv.innerHTML = "请刷新页面重试";
                     var refreshObj = document.getElementById("VaptchaRefresh");
-                    _fireEvent("MouseEvents", "click", refreshObj);
+                    if (refreshObj) {
+                        _fireEvent("MouseEvents", "click", refreshObj);
+                    }
                     return false;
                 case 4: vaptchaMessageDiv.innerHTML = "请求失败";
                     return false;
@@ -1925,7 +1931,9 @@
                     return false;
                 case 7: vaptchaMessageDiv.innerHTML = "绘制太频繁";
                     var refreshObj = document.getElementById("VaptchaRefresh");
-                    _fireEvent("MouseEvents", "click", refreshObj);
+                    if (refreshObj) {
+                        _fireEvent("MouseEvents", "click", refreshObj);
+                    }
                     return false;
                 default:
                     return true;
@@ -1938,9 +1946,11 @@
     function _validateVaptcha(data) {
         //vaptchaUrl + "vaptcha?callback=Vaptcha" + new Date().getTime()
         _getJsonp(vaptchaUrl + "validate?callback=Vaptcha" + new Date().getTime(), data, "callback", function (result) {
-            if (_detectResponse) {
+            if (_detectResponse(result)) {
                 var img = document.getElementById("vaptchaImg")
                 img.setAttribute("src", imgUrl + VaptchaData.coverimg);
+                vaptchaMessageDiv.innerHTML = "验证成功,匹配率： " + result.similarity;
+                vaptchaMessageDiv.style.color = "green";
             }
         })
     }
@@ -1951,7 +1961,7 @@
         var navDiv = document.createElement("div");
         navDiv.setAttribute("id", "vaptchaNavDiv");
         navDiv.innerHTML = "<div class=\"vaptcha\">\n<div class=\"vaptcha-main\">\n<img id='vaptchaImg' src=" + imgUrl + data.img + ">" +
-        "<div id=\"vaptchaOpt\" class=\"opt\">\n<div class=\"logo-main\">\n<div class=\"vaptcha-logo\"></div>\n<span>aptcha</span>\n</div>\n<a id=\"vaptchaRefresh\" class=\"reload\">\n<i class=\"refresh\"></i>\n</a>\n<div class=\"draw\">\n<a class=\"pencil\"></a>\n<span>or</span>\n<a class=\"mouse\"><img src=\"http://static.vaptcha.com/mouse.gif\" /></a>\n</div>\n</div><div id=\"vaptchaMessage\"></div>\n</div>\n</div>";
+            "<div id=\"vaptchaOpt\" class=\"opt\">\n<div class=\"logo-main\">\n<div class=\"vaptcha-logo\"></div>\n<span>aptcha</span>\n</div>\n<a id=\"vaptchaRefresh\" class=\"reload\">\n<i class=\"refresh\"></i>\n</a>\n<div class=\"draw\">\n<a class=\"pencil\"></a>\n<span>or</span>\n<a class=\"mouse\"><img src=\"http://static.vaptcha.com/mouse.gif\" /></a>\n</div>\n</div><div id=\"vaptchaMessage\"></div>\n</div>\n</div>";
 
         fragment.appendChild(navDiv);
 
@@ -1980,7 +1990,7 @@
                 VaptchaData = data;
                 _generateVaptchaImg(data);
                 _addEventHandler();
-                //_refreshVaptchaOvertime();
+                _refreshVaptchaOvertime();
                 if (typeof getImgCallback == "function") {
                     getImgCallback(data);
                 }
@@ -2004,14 +2014,17 @@
     }
     //超时自动刷新页面
     function _refreshVaptchaOvertime() {
-        var refreshObj = document.getElementById("vaptchaRefresh");
-        if (refreshObj) {
-            if (requestAmount > 10 || VaptchaInterval > 5) {
-                window.clearInterval(interval);
-            } else {
-                interval = window.setInterval(function () { _fireEvent('MouseEvents', 'click', refreshObj) }, 5000)
-            }
+        if (requestAmount > 10 || VaptchaInterval > 5) {
+            window.clearInterval(interval);
+        } else {
+            interval = window.setInterval(() => {
+                var refreshObj = document.getElementById("vaptchaRefresh");
+                if (refreshObj) {
+                    _fireEvent('MouseEvents', 'click', refreshObj);
+                }
+            }, 180000)
         }
+
     }
 
     /*外部接口对象*/
@@ -2035,7 +2048,7 @@
                         }
                     }
                 }
-                xhr.open("get", "./Home/GetCaptcha", true);
+                xhr.open("get", "./GetCaptcha", true);
                 xhr.send(null);
             });
         },

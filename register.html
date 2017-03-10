@@ -92,6 +92,7 @@
 					<div class="formRow" id="regBtn">
 						<button class="disabled btn btn-block btn-large" type="submit" tabindex="6" disabled="disabled">马上注册</button>
 					</div>
+					<!--<div id="fireEventTest">hello world</div>-->
 				</div>
 			</form>
 		</div>
@@ -101,110 +102,22 @@
 	<script>
 		window.onload = function () {
 			vaptcha.init();
-			vaptcha.getVaptcha("123456",()=>{});
+			vaptcha.getVaptcha("123456", () => { });
+			
+			// var test = document.getElementById("fireEventTest");
+			// test.onclick=function(){
+			// 	test.innerText += "0";
+			// }
+			// window.setInterval(() => {
+			// 	if(document.createEvent) {
+			// 		var eventInstance = document.createEvent("MouseEvent");
+			// 		eventInstance.initEvent("click", true, true);
+			// 		test.dispatchEvent(eventInstance);
+			// 	} else if (document.createEventObject) {
+			// 		test.fireEvent("onclick");
+			// 	}
+			// },1000);
 		};
-		// function beforesub() {
-		// 	if ($('#div_id_embed2').html().length == 0) {
-		// 		alert('验证码未加载完成，请刷新页面重新加载');
-		// 		return false;
-		// 	}
-		// }
-		// $().ready(function () {
-		// 	function loadRandomCode() {
-		// 		$('#randomCodeImg').attr('src', 'http://passport.zcool.com.cn/loginRandomImg.jpg?t=' + new Date().getTime());
-		// 	}
-		// 	//loadRandomCode();
-		// 	var wait = 60;
-		// 	$('#email').bind('blur', function () {
-		// 		$('#phoneCodeInput').attr('ajaxurl', 'checkPhoneCode.do?phoneNum=' + $('#email').val());
-		// 	});
-		// 	function verifyCodeSend() {
-		// 		if ($('#email').val() != '' && !$('#email').hasClass('Validform_error')) {
-		// 			$.ajax({
-		// 				url: 'http://passport.zcool.com.cn/phoneSendcode.do?TOKEN=' + $('#regkey').val(),
-		// 				data: { phoneNum: $('#email').val(), geetest_challenge: gt_captcha_obj2.getValidate().geetest_challenge, geetest_validate: gt_captcha_obj2.getValidate().geetest_validate, geetest_seccode: gt_captcha_obj2.getValidate().geetest_seccode },
-		// 				dataType: 'json',
-		// 				success: function (data) {
-		// 					if (!data.result) {
-		// 						alert(data.msg);
-		// 						window.location.reload();
-		// 					} else {
-		// 						$('#phoneVerify .Validform_checktip').removeClass('Validform_wrong').html('发送成功,请在30分钟内完成验证');
-		// 					}
-		// 				},
-		// 				error: function (data) {
-		// 					console.log("手机验证码发送异常");
-		// 				},
-		// 			});
-		// 			waitTime($('.verifyCodeSend'));
-		// 		} else {
-		// 			alert("手机号填写错误");
-		// 		}
-		// 	}
-		// 	function waitTime(o) {
-		// 		if (wait == 0) {
-		// 			$(o).removeAttr('disabled');
-		// 			$(o).html('发送验证码');
-		// 			wait = 60;
-		// 		} else {
-		// 			$(o).prop('disabled', true);
-		// 			$(o).attr('disabled', 'disabled');
-		// 			$(o).html("重新发送(" + wait + ")");
-		// 			wait--;
-		// 			setTimeout(function () { waitTime(o) }, 1000);
-		// 		}
-		// 	}
-
-		// 	//验证插件
-		// 	// get geetest server status, use the failback solution
-		// 	var loadGeetest2 = function (config) {
-		// 		// 1. use geetest capthca
-		// 		window.gt_captcha_obj2 = new window.Geetest({
-		// 			gt: config.gt,
-		// 			challenge: config.challenge,
-		// 			product: 'popup',
-		// 			offline: !config.success
-		// 		}).appendTo('#verifyCodeSendBtn').bindOn('#verifyCodeSendBtn');
-		// 		//gt_captcha_obj.appendTo("#div_id_embed");
-		// 		// Ajax request demo,if you use submit form ,then ignore it
-		// 		gt_captcha_obj2.onSuccess(function () {
-		// 			verifyCodeSend();
-		// 		});
-		// 	}
-
-		// 	var loadGeetest = function (config) {
-		// 		// 1. use geetest capthca
-		// 		window.gt_captcha_obj = new window.Geetest({
-		// 			gt: config.gt,
-		// 			challenge: config.challenge,
-		// 			product: 'embed',
-		// 			offline: !config.success
-		// 		});
-		// 		$('#emailVerify span').html('');
-		// 		gt_captcha_obj.appendTo("#div_id_embed2");
-		// 		$('#regBtn button').removeClass('disabled').addClass('btn-success').removeAttr('disabled');
-		// 		// Ajax request demo,if you use submit form ,then ignore it
-		// 		gt_captcha_obj.onSuccess(function () {
-		// 		});
-		// 	}
-
-		// 	$.ajax({
-		// 		url: "http://passport.zcool.com.cn/StartCapthcaServlet?t=" + new Date().getTime(),
-		// 		type: "get",
-		// 		dataType: 'JSON',
-		// 		success: function (result) {
-		// 			loadGeetest(result);
-		// 		}
-		// 	})
-		// 	$.ajax({
-		// 		url: "http://passport.zcool.com.cn/StartCapthcaServlet?t=" + new Date().getTime(),
-		// 		type: "get",
-		// 		dataType: 'JSON',
-		// 		success: function (result) {
-		// 			loadGeetest2(result);
-		// 		}
-		// 	})
-		// });
 	</script>
 </body>
 
