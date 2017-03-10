@@ -1863,7 +1863,9 @@
         var vaptchaPoz = document.getElementById("vaptchaPoz");
         var VaptchaOpt = document.getElementById("vaptchaOpt");
         _eventHandler(vaptchaPoz, "mouseover", function (e) {
-            VaptchaOpt.style.display = "block";
+            if (!paint) {
+                VaptchaOpt.style.display = "block";
+            }
         })
         _eventHandler(vaptchaPoz, "mouseout", function (e) {
             VaptchaOpt.style.display = "none";
@@ -1923,7 +1925,9 @@
                         _fireEvent("MouseEvents", "click", refreshObj);
                     }
                     return false;
-                case 4: vaptchaMessageDiv.innerHTML = "请求失败";
+                case 4:
+                    vaptchaMessageDiv.innerHTML = "验证未通过,匹配率： " + result.similarity;
+                    vaptchaMessageDiv.style.color = "red";
                     return false;
                 case 5: vaptchaMessageDiv.innerHTML = "刷新太快";
                     return false;
@@ -1975,7 +1979,36 @@
 
         var poz = document.getElementById("vaptchaPoz");
         poz.innerHTML = "";
+        var hideVaptcha = document.createElement("span");
+        hideVaptcha.innerHTML = "点击隐藏验证图片";
+        hideVaptcha.style.cssText = "width:496px;border:solid 1px #c4c3c3;background-color:#f9f9f9;color:#333;padding:11px 18px; border-radius:4px;font-size:2em;text-align:center;margin:20px 0px";
         poz.appendChild(fragment);
+        poz.appendChild(hideVaptcha);
+
+
+        hideVaptcha.onclick = function () {
+            poz.innerHTML = "";
+            var showVaptcha = document.createElement("span");
+            showVaptcha.innerHTML = "点击显示验证图片";
+            showVaptcha.style.cssText = "width:496px;border:solid 1px #c4c3c3;background-color:#f9f9f9;color:#333;padding:11px 18px; border-radius:4px;font-size:2em;text-align:center;margin:20px 0px";
+            poz.appendChild(showVaptcha);
+            showVaptcha.onclick = function () {
+                var xhr = new XMLHttpRequest();
+                xhr.onreadystatechange = function () {
+                    if (xhr.readyState == 4) {
+                        if ((xhr.status >= 200 && xhr.status < 300) || xhr.status == 304) {
+                            var data = JSON.parse(xhr.response);
+                            console.log(xhr.responseText);
+                            vaptcha.getVaptcha(data.challenge, data.siteid, () => { });
+                        } else {
+                            console.error("Request was unsuccessful:" + xhr.status);
+                        }
+                    }
+                }
+                xhr.open("get", "./GetCaptcha", true);
+                xhr.send(null);
+            }
+        }
     }
     //向Vaptcha请求图片
     function _getVaptcha(challengeParam, siteIdParam, fn) {
