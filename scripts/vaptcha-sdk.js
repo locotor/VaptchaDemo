@@ -17,12 +17,15 @@
         vaptchaUrl = "http://api.vaptcha.com/",
         imgUrl = "http://static.vaptcha.com/",
         requestAmount = 0,
-        validateCallback = new Function(),
-        getImgCallback = new Function(),
+        validateSuccessCallback = new Function(),
+        validateFailCallback = new Function(),
+        validateErrorCallback = new Function(),
+        getReadyCallback = new Function(),
+        refreshCallback = new Function(),
+        vaptchaProduct = "float",
         vaptchaCanvasDiv,
-        vaptchaMessageDiv,
         canvas,
-        context,
+        canvasContext,
         canvasWidth,
         canvasHeight,
         clickX = new Array(),
@@ -33,9 +36,12 @@
         startPoint = null,
         previousPoint = null,
         paint = false,
+        allowLeftPaint = false,
+        isValidated = false,
         startTime,
         sample = "()*,-./0123456789:?@ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz",
         isModernBrowser = false;
+
 
     /*辅助方法*/
     //获取符合条件的最后一个匹配值的index
@@ -153,6 +159,18 @@
             }
         }
     }
+    //手动触发事件
+    function _fireEvent(eventType, event, target) {
+        if (target) {
+            if (document.createEvent) {
+                var eventInstance = document.createEvent(eventType);
+                eventInstance.initEvent(event, true, true);
+                target.dispatchEvent(eventInstance);
+            } else if (document.createEventObject) {
+                target.fireEvent("on" + event);
+            }
+        }
+    }
     //阻止默认行为
     function _stopDefault(e) {
         e = e || window.event;
@@ -216,7 +234,6 @@
     function _unSetCookie(name, path, domain, secure) {
         _setCookie.set(name, "", new Date(0), path, demain, secure);
     }
-
 
 
     /*数据验证编码*/
@@ -361,7 +378,9 @@
                 dragSpotData.push({ 'x': startPoint.x, 'y': startPoint.y, "time": 0 });
                 dragSpotData.push({ 'x': coord.x, 'y': coord.y, "time": new Date().getTime() - startTime });
                 startPoint = null;
-                _prepareCanvas();
+                if (!canvas) {
+                    _prepareCanvas();
+                }
                 _redraw();
             }
         } else {
@@ -471,28 +490,25 @@
     //获取画板上下文
     function _getCanvasContext() {
         if (isModernBrowser) {
-            context = canvas.getContext("2d");
+            canvasContext = canvas.getContext("2d");
         } else {
             canvas = window.G_vmlCanvasManager.initElement(canvas);
-            context = canvas.getContext("2d");
+            canvasContext = canvas.getContext("2d");
         }
     }
     //设置画板元素
     function _prepareCanvas() {
-        //todo createElement div#vaptchaCanvasDiv dynamicly
         vaptchaCanvasDiv = document.getElementById("vaptchaCanvasDiv");
         if (!vaptchaCanvasDiv) {
             alert("初始化失败，请刷新页面重试")
             return;
         }
-        vaptchaCanvasDiv.style.cssText = "position:absolute;left:0;top:0;z-index:1000";
         canvas = document.createElement('canvas');
         canvasWidth = document.body.offsetWidth;
         canvasHeight = document.body.offsetHeight
         canvas.setAttribute('width', canvasWidth);
         canvas.setAttribute('height', canvasHeight);
-        canvas.setAttribute("id", "canvas")
-        //canvas.style.border = 'solid 1px black';
+        canvas.setAttribute("id", "canvas");
 
         vaptchaCanvasDiv.style.cursor = "url('images/pen.ico'),url('images/pen.png'),auto"
         vaptchaCanvasDiv.appendChild(canvas);
@@ -506,7 +522,9 @@
     };
     //清理画板
     function _clearCanvas() {
-        context.clearRect(0, 0, canvasWidth, canvasHeight);
+        if (canvasContext) {
+            canvasContext.clearRect(0, 0, canvasWidth, canvasHeight);
+        }
     };
     //添加画板轨迹坐标
     function _addClick(x, y, dragging) {
@@ -516,35 +534,37 @@
     };
     //绘制图形
     function _redraw() {
-        _clearCanvas();
-        var radius;
-        var i = 0;
-        for (; i < clickX.length; i++) {
-            radius = 5;
+        if (canvasContext) {
+            _clearCanvas();
+            var radius;
+            var i = 0;
+            for (; i < clickX.length; i++) {
+                radius = 5;
 
-            context.beginPath();
-            if (clickDrag[i] && i) {
-                context.moveTo(clickX[i - 1], clickY[i - 1]);
-            } else {
-                context.moveTo(clickX[i], clickY[i]);
+                canvasContext.beginPath();
+                if (clickDrag[i] && i) {
+                    canvasContext.moveTo(clickX[i - 1], clickY[i - 1]);
+                } else {
+                    canvasContext.moveTo(clickX[i], clickY[i]);
+                }
+                canvasContext.lineTo(clickX[i], clickY[i]);
+                canvasContext.closePath();
+
+                canvasContext.strokeStyle = '#659b41';
+
+                canvasContext.lineJoin = "round";
+                canvasContext.lineWidth = radius;
+                canvasContext.stroke();
             }
-            context.lineTo(clickX[i], clickY[i]);
-            context.closePath();
-
-            context.strokeStyle = '#659b41';
-
-            context.lineJoin = "round";
-            context.lineWidth = radius;
-            context.stroke();
+            //for ie10 -
+            if (!isModernBrowser) {
+                canvas = window.G_vmlCanvasManager.initElement(canvas);
+            }
+            if (canvas.getContext) {
+                //console.log("support");
+            }
+            //canvasContext.restore();
         }
-        //for ie10 -
-        if (!isModernBrowser) {
-            canvas = window.G_vmlCanvasManager.initElement(canvas);
-        }
-        if (canvas.getContext) {
-            //console.log("support");
-        }
-        //context.restore();
     };
     //for test 绘制采集的数据
     function _drawTest() {
@@ -556,26 +576,26 @@
         canvas.setAttribute('height', canvasHeight);
         vaptchaCanvasDiv.appendChild(canvas);
         canvas.setAttribute('id', 'canvas');
-        context = document.getElementById('canvas').getContext("2d");
+        canvasContext = document.getElementById('canvas').getContext("2d");
 
         var radius;
         for (var i = 0; i < dragSpotData.length; i++) {
             dragSpotData[i].x += 100;
             dragSpotData[i].y += 100;
             radius = 5;
-            context.beginPath();
+            canvasContext.beginPath();
             if (dragSpotData[i] && i) {
-                context.moveTo(dragSpotData[i - 1].x, dragSpotData[i - 1].y);
+                canvasContext.moveTo(dragSpotData[i - 1].x, dragSpotData[i - 1].y);
             } else {
-                context.moveTo(dragSpotData[i].x, dragSpotData[i].y);
+                canvasContext.moveTo(dragSpotData[i].x, dragSpotData[i].y);
             }
-            context.lineTo(dragSpotData[i].x, dragSpotData[i].y);
-            context.closePath();
+            canvasContext.lineTo(dragSpotData[i].x, dragSpotData[i].y);
+            canvasContext.closePath();
 
-            context.strokeStyle = "red";
-            context.lineJoin = "round";
-            context.lineWidth = radius;
-            context.stroke();
+            canvasContext.strokeStyle = "red";
+            canvasContext.lineJoin = "round";
+            canvasContext.lineWidth = radius;
+            canvasContext.stroke();
         }
 
     }
@@ -1201,7 +1221,7 @@
                 /**
                  * This class implements CanvasRenderingContext2D interface as described by
                  * the WHATWG.
-                 * @param {HTMLElement} canvasElement The element that the 2D context should
+                 * @param {HTMLElement} canvasElement The element that the 2D canvasContext should
                  * be associated with
                  */
                 function CanvasRenderingContext2D_(canvasElement) {
@@ -1211,7 +1231,7 @@
                     this.aStack_ = [];
                     this.currentPath_ = [];
 
-                    // Canvas context properties
+                    // Canvas canvasContext properties
                     this.strokeStyle = '#000';
                     this.fillStyle = '#000';
 
@@ -1780,13 +1800,18 @@
     }
     //初始化数据
     function _initData() {
-        requestAmount = 0,
-            validateCallback = new Function(),
-            getImgCallback = new Function(),
-            vaptchaCanvasDiv = null,
-            canvasWidth = 0,
-            canvasHeight = 0,
-            clickX = new Array();
+        _removeCanvas();
+        requestAmount = 0;
+        validateSuccessCallback = new Function();
+        validateFailCallback = new Function();
+        validateErrorCallback = new Function();
+        getReadyCallback = new Function();
+        refreshCallback = new Function();
+        getReadyCallback = new Function();
+        vaptchaCanvasDiv = null;
+        canvasWidth = 0;
+        canvasHeight = 0;
+        clickX = new Array();
         clickY = new Array();
         clickDrag = new Array();
         dragSpotData = new Array();
@@ -1794,37 +1819,37 @@
         startPoint = null;
         previousPoint = null;
         paint = false;
+        allowLeftPaint = false;
         startTime = 0;
         canvas = null;
-        context = null;
+        canvasContext = null;
     }
     //添加鼠标事件
     function _addEventHandler() {
-        //todo：只有拖动的时候才阻止原生鼠标右键菜单事件
         _eventHandler(document, "contextmenu", function (e) {
-            if (paint) {
+            if (paint || allowLeftPaint) {
                 _stopDefault(e);
                 _initData();
             }
-            _initData();
         })
 
-        //鼠标右键按下事件
+        //鼠标按下事件
         _eventHandler(document, "mousedown", function (e) {
-            // //排除其他鼠标按键
-            if ((e.which !== 3 && e.button !== 2) || !challenge) return;
-            //获取坐标
-            var coord = _getMouseCoords(e);
-            _addClick(coord.x, coord.y, false);
-            startTime = new Date().getTime();
-            startPoint = {
-                x: coord.x,
-                y: coord.y,
-                time: new Date().getTime()
+            //排除其他鼠标按键
+            if ((e.which == 3 || e.button == 2 || allowLeftPaint) && challenge && !isValidated) {
+                //获取坐标
+                var coord = _getMouseCoords(e);
+                _addClick(coord.x, coord.y, false);
+                startTime = new Date().getTime();
+                startPoint = {
+                    x: coord.x,
+                    y: coord.y,
+                    time: new Date().getTime()
+                }
             }
         })
 
-        //检测鼠标右键移动事件
+        //检测鼠标移动事件
         _eventHandler(document, "mousemove", function (e) {
             //判断之前是否按下了鼠标右键
             if (startPoint || paint) {
@@ -1840,8 +1865,8 @@
         //检测鼠标抬起
         _eventHandler(document, "mouseup", function (e) {
             //排除其他鼠标按键
-            if ((e.which !== 3 && e.button !== 2) || !challenge || !paint) return;
-            else {
+            if ((e.which == 3 || e.button == 2 || allowLeftPaint) && challenge && paint)
+            {
                 var data = _assemblyCoordDate(dragSpotData);
                 //for ie test
                 _calculateCharacteristic(dragSpotData);
@@ -1852,29 +1877,17 @@
                         "challenge": challenge,
                     });
                 }
-                _removeCanvas();
-                //性能检测：
+                allowLeftPaint = false;
+                //解码检测：
                 _decodeCoords(data);
-                //_drawTest();
+                _removeCanvas();
             }
-        })
-
-        //鼠标hover
-        var vaptchaPoz = document.getElementById("vaptchaPoz");
-        var VaptchaOpt = document.getElementById("vaptchaOpt");
-        _eventHandler(vaptchaPoz, "mouseover", function (e) {
-            if (!paint) {
-                VaptchaOpt.style.display = "block";
-            }
-        })
-        _eventHandler(vaptchaPoz, "mouseout", function (e) {
-            VaptchaOpt.style.display = "none";
         })
 
         //刷新
-        var VaptchaRefresh = document.getElementById("vaptchaRefresh");
-        if (VaptchaRefresh) {
-            _eventHandler(VaptchaRefresh, "click", function (e) {
+        var vaptchaRefresh = document.getElementById("vaptchaRefresh");
+        if (vaptchaRefresh) {
+            _eventHandler(vaptchaRefresh, "click", function (e) {
                 if ((new Date().getTime() - VaptchaInitTime) < 180000) {
                     VaptchaInterval += (1 / (new Date().getTime() - VaptchTime));
                 } else {
@@ -1895,138 +1908,208 @@
             })
         }
 
-        //鼠标左键图标点击事件
-        // $(document).on('click', '#drewByLeft', function (event) {
-        // });
-    }
-    //触发事件
-    function _fireEvent(eventType, event, target) {
-        if (target) {
-            if (document.createEvent) {
-                var eventInstance = document.createEvent(eventType);
-                eventInstance.initEvent(event, true, true);
-                target.dispatchEvent(eventInstance);
-            } else if (document.createEventObject) {
-                target.fireEvent("on" + event);
-            }
+        //切换左键绘制（右键取消
+        var switchLeftDraw = document.getElementById("vaptchaLeftClick");
+        if (switchLeftDraw) {
+            _eventHandler(switchLeftDraw, "click", function (e) {
+                allowLeftPaint = true;
+                _prepareCanvas();
+                e.stopPropagation();
+            })
         }
     }
 
-    /*与vaptcha服务器交互*/
 
-    function _detectResponse(data) {
-        if (vaptchaMessageDiv) {
-            switch (data.code) {
-                case 1: vaptchaMessageDiv.innerHTML = "访问被拒绝";
-                    return false;
-                case 2: vaptchaMessageDiv.innerHTML = "请刷新页面重试";
-                    var refreshObj = document.getElementById("VaptchaRefresh");
-                    if (refreshObj) {
-                        _fireEvent("MouseEvents", "click", refreshObj);
-                    }
-                    return false;
-                case 4:
-                    vaptchaMessageDiv.innerHTML = "验证未通过,匹配率： " + result.similarity;
-                    vaptchaMessageDiv.style.color = "red";
-                    return false;
-                case 5: vaptchaMessageDiv.innerHTML = "刷新太快";
-                    return false;
-                case 6: vaptchaMessageDiv.innerHTML = "刷新太频繁";
-                    return false;
-                case 7: vaptchaMessageDiv.innerHTML = "绘制太频繁";
-                    var refreshObj = document.getElementById("VaptchaRefresh");
-                    if (refreshObj) {
-                        _fireEvent("MouseEvents", "click", refreshObj);
-                    }
-                    return false;
-                default:
-                    return true;
+    /*生成Vaptcha*/
+    //嵌入式
+    function _generateEmbedVaptcha() {
+        var fragment = document.createDocumentFragment();
+
+        var navDiv = document.createElement("div");
+        navDiv.setAttribute("id", "vaptchaNavDiv");
+        navDiv.innerHTML = "<div id=\"vaptcha\" class=\"vaptcha\">\n<div class=\"vaptcha-main\">\n<img id='vaptchaImg'>\n<div id=\"vaptchaOpt\" class=\"opt\">\n<div class=\"logo-main\">\n<div class=\"vaptcha-logo\"></div>\n<span>aptcha</span>\n</div>\n<a id='vaptchaRefresh' class=\"reload\">\n<i class=\"refresh\"></i>\n</a>\n<div class=\"draw\">\n<a id=\"vaptchaLeftClick\" class=\"pencil\"></a>\n<span>or</span>\n<a class=\"mouse\"><img src=\"http://static.vaptcha.com/mouse.gif\" /></a>\n";
+        fragment.appendChild(navDiv);
+
+        var TempCanvasDiv = document.createElement("div");
+        TempCanvasDiv.setAttribute("id", "vaptchaCanvasDiv");
+        fragment.appendChild(TempCanvasDiv);
+        var styleText = "@charset \"UTF-8\";\nbody {\n\tfont-family: \"Microsoft YaHei\", \u5FAE\u8F6F\u96C5\u9ED1, \"MicrosoftJhengHei\", \u534E\u6587\u7EC6\u9ED1, STHeiti, MingLiu;\n}\n\n#vaptchaPoz {\n\t\n}\n\n#vaptchaNavDiv {\n\tposition: relative;\n\t// top: 180px;\n\t/*border: 1px solid #ccc;*/\n\t/*cursor: url(images/pen.ico), url(images/pen.png), auto;*/\n}\n\n#vaptchaCanvasDiv {\n\tposition: fixed;\n\tleft: 0px;\n\ttop: 0px;\n\tz-index: 1000;\n}\n\n.vaptcha {\n\twidth: 378px;\n\toverflow: hidden;\n}\n.vaptcha:hover .vaptcha-main .opt{\n\t/*opacity: 1;*/\n\ttop: 0;\n}\n.vaptcha .vaptcha-main {\n\twidth: 100%;\n\theight: 172px;\n\tposition: relative;\n}\n\n.vaptcha .vaptcha-main .opt {\n\twidth: 100%;\n\theight: 30px;\n\tbackground: rgba(255, 255, 255, 0.9);\n\tline-height: 30px;\n\tposition: absolute;\n\ttop: -30px;\n\t/*opacity: 0;*/\n\ttransition: top 0.3s ; \n\t-webkit-transition: top 0.3s ; \n}\n\n.vaptcha .vaptcha-main .opt a:hover {\n\tcursor: pointer;\n}\n\n.vaptcha .vaptcha-main .opt .logo-main {\n\tfloat: left;\n\tfont-size: 14px;\n\tpadding-left: 6px;\n}\n\n.vaptcha .vaptcha-main .opt .logo-main .vaptcha-logo {\n\tdisplay: inline-block;\n\twidth: 14px;\n\theight: 16px;\n\tbackground: url(http://static.vaptcha.com/validate.png) no-repeat;\n\tbackground-position: 0 0;\n}\n\n.vaptcha .vaptcha-main .opt .logo-main span {\n\tmargin-left: -4px;\n}\n\n.vaptcha .vaptcha-main .opt .reload {\n\tfloat: right;\n\tpadding-right: 6px;\n}\n\n.vaptcha .vaptcha-main .opt .reload .refresh {\n\tdisplay: inline-block;\n\twidth: 16px;\n\theight: 16px;\n\tbackground: url(http://static.vaptcha.com/validate.png) no-repeat;\n\tbackground-position: 0 -55px;\n}\n\n.vaptcha .vaptcha-main .opt .reload .refresh:hover {\n\tbackground-position: 0 -71px;\n}\n\n.vaptcha .vaptcha-main .opt .draw {\n\twidth: 200px;\n\tmargin: 0 auto;\n\ttext-align: center;\n\tposition: relative;\n}\n\n.vaptcha .vaptcha-main .opt .draw .pencil {\n\tdisplay: inline-block;\n\twidth: 16px;\n\theight: 16px;\n\tbackground: url(http://static.vaptcha.com/validate.png) no-repeat;\n\tbackground-position: 0 -19px;\n}\n\n.vaptcha .vaptcha-main .opt .draw .pencil:hover {\n\tbackground-position: 0 -38px;\n}\n\n.vaptcha .vaptcha-main .opt .draw span {\n\tfont-size: 14px;\n\tcolor: #aaa;\n\tmargin: 0 10px;\n}\n\n.vaptcha .vaptcha-main .opt .draw .mouse img {\n\tvertical-align: text-bottom;\n}\n\n.vaptcha .vaptcha-main .opt .draw i{\n\tdisplay: inline-block;\n\twidth: 16px;\n\theight: 16px;\n\tbackground: url(http://static.vaptcha.com/validate.png) no-repeat;\n\tposition: absolute;\n\ttop: 7px;\n}\n.vaptcha .vaptcha-main .opt .draw.pass i{\n\tbackground-position: 0 -91px;\n}\n.vaptcha .vaptcha-main .opt .draw.fail i{\n\tbackground-position: 0 -109px;\n}\n.vaptcha .vaptcha-main .opt .draw.pass span,.vaptcha .vaptcha-main .opt .draw.fail span{\n\tfont-size: 12px;\n\tcolor: #878787;\n\tmargin: 0;\n}\n.vaptcha .vaptcha-main .opt .draw.pass span.change.text,.vaptcha .vaptcha-main .opt .draw.fail span.change.text{\n\tfont-size: 14px;\n\tmargin-left: 20px;\n}\n.vaptcha .vaptcha-main .opt .draw.pass span.change{\n\tcolor: #00D8A3;\n}\n.vaptcha .vaptcha-main .opt .draw.fail span.change{\n\tcolor: #D90000;\n}";
+        _insertStyle(styleText)
+
+
+        var poz = document.getElementById("vaptchaPoz");
+        poz.innerHTML = "";
+        poz.appendChild(fragment);
+        getReadyCallback();
+    }
+    //浮动式
+    function _generateFloatVaptcha() {
+        var fragment = document.createDocumentFragment();
+
+        var navDiv = document.createElement("div");
+        navDiv.setAttribute("id", "vaptchaNavDiv");
+        navDiv.innerHTML = "<div id=\"vaptcha\" class=\"vaptcha\">\n<div class=\"vaptcha-main\">\n<img id='vaptchaImg'>\n<div id=\"vaptchaOpt\" class=\"opt\">\n<div class=\"logo-main\">\n<div class=\"vaptcha-logo\"></div>\n<span>aptcha</span>\n</div>\n<a id='vaptchaRefresh' class=\"reload\">\n<i class=\"refresh\"></i>\n</a>\n<div class=\"draw\">\n<a id=\"vaptchaLeftClick\" class=\"pencil\"></a>\n<span>or</span>\n<a class=\"mouse\"><img src=\"http://static.vaptcha.com/mouse.gif\" /></a>\n";
+        fragment.appendChild(navDiv);
+
+        var TempCanvasDiv = document.createElement("div");
+        TempCanvasDiv.setAttribute("id", "vaptchaCanvasDiv");
+        fragment.appendChild(TempCanvasDiv);
+        var styleText = "@charset \"UTF-8\";\nbody {\n\tfont-family: \"Microsoft YaHei\", \u5FAE\u8F6F\u96C5\u9ED1, \"MicrosoftJhengHei\", \u534E\u6587\u7EC6\u9ED1, STHeiti, MingLiu;\n}\n\n#vaptchaPoz {\n\tmargin: 300px;\n}\n\n#vaptchaNavDiv {\n\tposition: relative;\n\t/*border: 1px solid #ccc;*/\n\t/*cursor: url(images/pen.ico), url(images/pen.png), auto;*/\n}\n\n#vaptchaCanvasDiv {\n\tposition: fixed;\n\tleft: 0px;\n\ttop: 0px;\n\tz-index: 1000;\n}\n\n.vaptcha {\n\twidth: 378px;\n\toverflow: hidden;\n\tposition: absolute;\n\ttop: -172px;\n\t\n}\n.vaptcha-hide{\n\tdisplay: none;\n\topacity: 0;\n}\n.vaptcha-show{\n\tdisplay: block;\n\topacity: 1;\n}\n.vaptcha-animate{\n\tdisplay: block;\n\topacity: 1;\n\ttransition: opacity 0.4s ; \n\t-webkit-transition: opacity 0.4s ; \n}\n\n.vaptcha:hover .vaptcha-main .opt{\n\ttop: 0;\n}\n.vaptcha .vaptcha-main {\n\twidth: 100%;\n\theight: 172px;\n\tposition: relative;\n}\n\n.vaptcha .vaptcha-main .opt {\n\twidth: 100%;\n\theight: 30px;\n\tbackground: rgba(255, 255, 255, 0.9);\n\tline-height: 30px;\n\tposition: absolute;\n\ttop: -30px;\n\ttransition: top 0.3s ; \n\t-webkit-transition: top 0.3s ; \n}\n\n.vaptcha .vaptcha-main .opt a:hover {\n\tcursor: pointer;\n}\n\n.vaptcha .vaptcha-main .opt .logo-main {\n\tfloat: left;\n\tfont-size: 14px;\n\tpadding-left: 6px;\n}\n\n.vaptcha .vaptcha-main .opt .logo-main .vaptcha-logo {\n\tdisplay: inline-block;\n\twidth: 14px;\n\theight: 16px;\n\tbackground: url(http://static.vaptcha.com/validate.png) no-repeat;\n\tbackground-position: 0 0;\n}\n\n.vaptcha .vaptcha-main .opt .logo-main span {\n\tmargin-left: -4px;\n}\n\n.vaptcha .vaptcha-main .opt .reload {\n\tfloat: right;\n\tpadding-right: 6px;\n}\n\n.vaptcha .vaptcha-main .opt .reload .refresh {\n\tdisplay: inline-block;\n\twidth: 16px;\n\theight: 16px;\n\tbackground: url(http://static.vaptcha.com/validate.png) no-repeat;\n\tbackground-position: 0 -55px;\n}\n\n.vaptcha .vaptcha-main .opt .reload .refresh:hover {\n\tbackground-position: 0 -71px;\n}\n\n.vaptcha .vaptcha-main .opt .draw {\n\twidth: 200px;\n\tmargin: 0 auto;\n\ttext-align: center;\n\tposition: relative;\n}\n\n.vaptcha .vaptcha-main .opt .draw .pencil {\n\tdisplay: inline-block;\n\twidth: 16px;\n\theight: 16px;\n\tbackground: url(http://static.vaptcha.com/validate.png) no-repeat;\n\tbackground-position: 0 -19px;\n}\n\n.vaptcha .vaptcha-main .opt .draw .pencil:hover {\n\tbackground-position: 0 -38px;\n}\n\n.vaptcha .vaptcha-main .opt .draw span {\n\tfont-size: 14px;\n\tcolor: #aaa;\n\tmargin: 0 10px;\n}\n\n.vaptcha .vaptcha-main .opt .draw .mouse img {\n\tvertical-align: text-bottom;\n}\n\n.vaptcha .vaptcha-main .opt .draw i{\n\tdisplay: inline-block;\n\twidth: 16px;\n\theight: 16px;\n\tbackground: url(http://static.vaptcha.com/validate.png) no-repeat;\n\tposition: absolute;\n\ttop: 7px;\n}\n.vaptcha .vaptcha-main .opt .draw.pass i{\n\tbackground-position: 0 -91px;\n}\n.vaptcha .vaptcha-main .opt .draw.fail i{\n\tbackground-position: 0 -109px;\n}\n.vaptcha .vaptcha-main .opt .draw.pass span,.vaptcha .vaptcha-main .opt .draw.fail span{\n\tfont-size: 12px;\n\tcolor: #878787;\n\tmargin: 0;\n}\n.vaptcha .vaptcha-main .opt .draw.pass span.change.text,.vaptcha .vaptcha-main .opt .draw.fail span.change.text{\n\tfont-size: 14px;\n\tmargin-left: 20px;\n}\n.vaptcha .vaptcha-main .opt .draw.pass span.change{\n\tcolor: #00D8A3;\n}\n.vaptcha .vaptcha-main .opt .draw.fail span.change{\n\tcolor: #D90000;\n}";
+        _insertStyle(styleText)
+
+
+        var poz = document.getElementById("vaptchaPoz");
+        poz.innerHTML = "";
+        var switchVaptcha = document.createElement("span");
+        switchVaptcha.innerHTML = "点击隐藏验证图片";
+        switchVaptcha.style.cssText = "width:496px;border:solid 1px #c4c3c3;background-color:#f9f9f9;color:#333;padding:11px 18px; border-radius:4px;font-size:2em;text-align:center;margin:20px 0px";
+        poz.appendChild(fragment);
+        poz.appendChild(switchVaptcha);
+
+        _eventHandler(switchVaptcha, "click", function () {
+            if (navDiv.style.display != "none") {
+                navDiv.style.display = "none";
+                switchVaptcha.innerHTML = "点击显示验证图片";
+            } else {
+                navDiv.style.display = "block";
+                switchVaptcha.innerHTML = "点击隐藏验证图片";
             }
-        } else {
-            //todo 在poz后面append一个
+        })
+        getReadyCallback();
+    };
+    //弹出式
+    function _generatePopupVaptcha() {
+        var fragment = document.createDocumentFragment();
+
+        var navDiv = document.createElement("div");
+        navDiv.setAttribute("id", "vaptchaNavDiv");
+        navDiv.innerHTML = "<div class=\"vaptcha-mask\"></div><div id=\"vaptcha\" class=\"vaptcha\">\n<div class=\"vaptcha-main\">\n<img id='vaptchaImg'>\n<div id=\"vaptchaOpt\" class=\"opt\">\n<div class=\"logo-main\">\n<div class=\"vaptcha-logo\"></div>\n<span>aptcha</span>\n</div>\n<a id='vaptchaRefresh' class=\"reload\">\n<i class=\"refresh\"></i>\n</a>\n<div class=\"draw\">\n<a id=\"vaptchaLeftClick\" class=\"pencil\"></a>\n<span>or</span>\n<a class=\"mouse\"><img src=\"http://static.vaptcha.com/mouse.gif\" /></a>\n";
+        fragment.appendChild(navDiv);
+
+        var TempCanvasDiv = document.createElement("div");
+        TempCanvasDiv.setAttribute("id", "vaptchaCanvasDiv");
+        fragment.appendChild(TempCanvasDiv);
+        var styleText = "\n@charset \"UTF-8\";\nbody {\n\tfont-family: \"Microsoft YaHei\", \u5FAE\u8F6F\u96C5\u9ED1, \"MicrosoftJhengHei\", \u534E\u6587\u7EC6\u9ED1, STHeiti, MingLiu;\n}\n\n#vaptchaPoz {\n}\n\n.vaptcha-mask{\n\tposition: fixed;\n    width: 100%;\n    height: 100%;\n    top: 0;\n    left: 0;\n    background-color: black;\n    opacity: 0.6;\n    filter: alpha(opacity=60);\n}\n\n#vaptchaNavDiv {\n\tmargin-left: 50%;\n\tmargin-top: 50%;\n\tposition: fixed;\n\tleft: -189px;\n\ttop: -98px;\n\t/*border: 1px solid #ccc;*/\n\t/*cursor: url(images/pen.ico), url(images/pen.png), auto;*/\n}\n\n#vaptchaCanvasDiv {\n\tposition: fixed;\n\tleft: 0px;\n\ttop: 0px;\n\tz-index: 1000;\n}\n\n.vaptcha {\n\twidth: 378px;\n\toverflow: hidden;\n}\n\n.vaptcha:hover .vaptcha-main .opt{\n\t/*opacity: 1;*/\n\ttop: 0;\n}\n.vaptcha .vaptcha-main {\n\twidth: 100%;\n\theight: 172px;\n\tposition: relative;\n}\n\n.vaptcha .vaptcha-main .opt {\n\twidth: 100%;\n\theight: 30px;\n\tbackground: rgba(255, 255, 255, 0.9);\n\tline-height: 30px;\n\tposition: absolute;\n\ttop: -30px;\n\t/*opacity: 0;*/\n\ttransition: top 0.3s ; \n\t-webkit-transition: top 0.3s ; \n}\n\n\n.vaptcha .vaptcha-main .opt a:hover {\n\tcursor: pointer;\n}\n\n.vaptcha .vaptcha-main .opt .logo-main {\n\tfloat: left;\n\tfont-size: 14px;\n\tpadding-left: 6px;\n}\n\n.vaptcha .vaptcha-main .opt .logo-main .vaptcha-logo {\n\tdisplay: inline-block;\n\twidth: 14px;\n\theight: 16px;\n\tbackground: url(http://static.vaptcha.com/validate.png) no-repeat;\n\tbackground-position: 0 0;\n}\n\n.vaptcha .vaptcha-main .opt .logo-main span {\n\tmargin-left: -4px;\n}\n\n.vaptcha .vaptcha-main .opt .reload {\n\tfloat: right;\n\tpadding-right: 6px;\n}\n\n.vaptcha .vaptcha-main .opt .reload .refresh {\n\tdisplay: inline-block;\n\twidth: 16px;\n\theight: 16px;\n\tbackground: url(http://static.vaptcha.com/validate.png) no-repeat;\n\tbackground-position: 0 -55px;\n}\n\n.vaptcha .vaptcha-main .opt .reload .refresh:hover {\n\tbackground-position: 0 -71px;\n}\n\n.vaptcha .vaptcha-main .opt .draw {\n\twidth: 200px;\n\tmargin: 0 auto;\n\ttext-align: center;\n\tposition: relative;\n}\n\n.vaptcha .vaptcha-main .opt .draw .pencil {\n\tdisplay: inline-block;\n\twidth: 16px;\n\theight: 16px;\n\tbackground: url(http://static.vaptcha.com/validate.png) no-repeat;\n\tbackground-position: 0 -19px;\n}\n\n.vaptcha .vaptcha-main .opt .draw .pencil:hover {\n\tbackground-position: 0 -38px;\n}\n\n.vaptcha .vaptcha-main .opt .draw span {\n\tfont-size: 14px;\n\tcolor: #aaa;\n\tmargin: 0 10px;\n}\n\n.vaptcha .vaptcha-main .opt .draw .mouse img {\n\tvertical-align: text-bottom;\n}\n\n.vaptcha .vaptcha-main .opt .draw i{\n\tdisplay: inline-block;\n\twidth: 16px;\n\theight: 16px;\n\tbackground: url(http://static.vaptcha.com/validate.png) no-repeat;\n\tposition: absolute;\n\ttop: 7px;\n}\n.vaptcha .vaptcha-main .opt .draw.pass i{\n\tbackground-position: 0 -91px;\n}\n.vaptcha .vaptcha-main .opt .draw.fail i{\n\tbackground-position: 0 -109px;\n}\n.vaptcha .vaptcha-main .opt .draw.pass span,.vaptcha .vaptcha-main .opt .draw.fail span{\n\tfont-size: 12px;\n\tcolor: #878787;\n\tmargin: 0;\n}\n.vaptcha .vaptcha-main .opt .draw.pass span.change.text,.vaptcha .vaptcha-main .opt .draw.fail span.change.text{\n\tfont-size: 14px;\n\tmargin-left: 20px;\n}\n.vaptcha .vaptcha-main .opt .draw.pass span.change{\n\tcolor: #00D8A3;\n}\n.vaptcha .vaptcha-main .opt .draw.fail span.change{\n\tcolor: #D90000;\n}";
+        _insertStyle(styleText)
+
+
+        var poz = document.getElementById("vaptchaPoz");
+        poz.innerHTML = "";
+        var switchVaptcha = document.createElement("span");
+        switchVaptcha.innerHTML = "点击隐藏验证图片";
+        switchVaptcha.style.cssText = "width:496px;border:solid 1px #c4c3c3;background-color:#f9f9f9;color:#333;padding:11px 18px; border-radius:4px;font-size:2em;text-align:center;margin:20px 0px";
+        poz.appendChild(fragment);
+        poz.appendChild(switchVaptcha);
+
+        _eventHandler(switchVaptcha, "click", function () {
+            if (navDiv.style.display != "none") {
+                navDiv.style.display = "none";
+                switchVaptcha.innerHTML = "点击显示验证图片";
+            } else {
+                navDiv.style.display = "block";
+                switchVaptcha.innerHTML = "点击隐藏验证图片";
+            }
+        })
+        getReadyCallback();
+    }
+
+
+    /*与vaptcha服务器交互*/
+    function _detectResponse(data) {
+        var vaptchaMessageDiv = document.createElement("div");
+        vaptchaMessageDiv.setAttribute("class", "draw fail")
+        var vaptchaOpt = document.getElementById("vaptchaOpt");
+        var refreshObj = document.getElementById("vaptchaRefresh");
+        switch (data.code) {
+            case 1:
+                vaptchaOpt.removeChild(vaptchaOpt.lastChild);
+                vaptchaMessageDiv.innerHTML = "<i></i><span class=\"change text\">访问被拒绝</span>";
+                vaptchaOpt.appendChild(vaptchaMessageDiv);
+                validateErrorCallback();
+                return false;
+            case 2:
+                if (refreshObj) {
+                    _fireEvent("MouseEvents", "click", refreshObj);
+                };
+                validateErrorCallback();
+                return false;
+            case 5:
+                vaptchaOpt.removeChild(vaptchaOpt.lastChild);
+                vaptchaOpt.removeChild(refreshObj)
+                vaptchaMessageDiv.innerHTML = "<i></i><span class=\"change text\">刷新太快</span>";
+                vaptchaOpt.appendChild(vaptchaMessageDiv);
+                validateErrorCallback();
+                return false;
+            case 6:
+                vaptchaOpt.removeChild(vaptchaOpt.lastChild);
+                vaptchaOpt.removeChild(refreshObj);
+                vaptchaMessageDiv.innerHTML = "<i></i><span class=\"change text\">刷新太频繁</span>";
+                vaptchaOpt.appendChild(vaptchaMessageDiv);
+                validateErrorCallback();
+                return false;
+                validateErrorCallback();
+                return false;
+            case 7: vaptchaMessageDiv.innerHTML = "绘制太频繁";        
+                if (refreshObj) {
+                    _fireEvent("MouseEvents", "click", refreshObj);
+                };
+                validateErrorCallback();
+                return false;
+            default:
+                return true;
         }
     }
     //向Vaptcha验证数据
     function _validateVaptcha(data) {
         //vaptchaUrl + "vaptcha?callback=Vaptcha" + new Date().getTime()
         _getJsonp(vaptchaUrl + "validate?callback=Vaptcha" + new Date().getTime(), data, "callback", function (result) {
-            if (_detectResponse(result)) {
+            var vaptchaMessageDiv = document.createElement("div");
+            if (result.code == 4) {
+                vaptchaOpt.removeChild(vaptchaOpt.lastChild);
+                vaptchaMessageDiv.setAttribute("class", "draw fail");
+                vaptchaMessageDiv.innerHTML = "<i></i><span class=\"change text\">验证未通过 </span><span class=\"change\">" + result.similarity + "</span><span> 匹配</span>";
+                vaptchaOpt.appendChild(vaptchaMessageDiv);
+                validateErrorCallback();
+            } else if (_detectResponse(result)) {
                 var img = document.getElementById("vaptchaImg")
                 img.setAttribute("src", imgUrl + VaptchaData.coverimg);
-                vaptchaMessageDiv.innerHTML = "验证成功,匹配率： " + result.similarity;
-                vaptchaMessageDiv.style.color = "green";
+                vaptchaOpt.removeChild(vaptchaOpt.lastChild);
+                vaptchaMessageDiv.setAttribute("class", "draw pass");
+                vaptchaMessageDiv.innerHTML = "<i></i><span class=\"change text\">验证通过 </span><span class=\"change\">" + result.similarity + "</span><span> 匹配</span>";
+                vaptchaOpt.appendChild(vaptchaMessageDiv);
+                isValidated = true;
             }
         })
     }
-    //生成Vaptcha图片
-    function _generateVaptchaImg(data) {
-        var fragment = document.createDocumentFragment();
-
-        var navDiv = document.createElement("div");
-        navDiv.setAttribute("id", "vaptchaNavDiv");
-        navDiv.innerHTML = "<div class=\"vaptcha\">\n<div class=\"vaptcha-main\">\n<img id='vaptchaImg' src=" + imgUrl + data.img + ">" +
-            "<div id=\"vaptchaOpt\" class=\"opt\">\n<div class=\"logo-main\">\n<div class=\"vaptcha-logo\"></div>\n<span>aptcha</span>\n</div>\n<a id=\"vaptchaRefresh\" class=\"reload\">\n<i class=\"refresh\"></i>\n</a>\n<div class=\"draw\">\n<a class=\"pencil\"></a>\n<span>or</span>\n<a class=\"mouse\"><img src=\"http://static.vaptcha.com/mouse.gif\" /></a>\n</div>\n</div><div id=\"vaptchaMessage\"></div>\n</div>\n</div>";
-
-        fragment.appendChild(navDiv);
-
-        var TempCanvasDiv = document.createElement("div");
-        TempCanvasDiv.setAttribute("id", "vaptchaCanvasDiv");
-        fragment.appendChild(TempCanvasDiv);
-
-        var styleText = "@charset \"UTF-8\";\nbody {\n\tfont-family: \"Microsoft YaHei\", \u5FAE\u8F6F\u96C5\u9ED1, \"MicrosoftJhengHei\", \u534E\u6587\u7EC6\u9ED1, STHeiti, MingLiu;\n}\n\n.vaptcha {\n\twidth: 378px;\n}\n\n.vaptcha .vaptcha-main {\n\twidth: 100%;\n\theight: 172px;\n  position: relative;\n}\n\n.vaptcha .vaptcha-main .opt {\n display:none; width: 100%;\n\theight: 30px;\n\tbackground: rgba(255, 255, 255, 0.9);\n\tpadding: 0 6px;\n\tline-height: 30px;\n\toverflow: hidden;\n  position: absolute;\n  top: 0;\n      box-sizing: border-box;\n\t  -moz-box-sizing: border-box;\n\t  -webkit-box-sizing:border-box;\n}\n\n.vaptcha .vaptcha-main .opt a:hover {\n\tcursor: pointer;\n}\n\n.vaptcha .vaptcha-main .opt .logo-main {\n\tfloat: left;\n\tfont-size: 14px;\n}\n\n.vaptcha .vaptcha-main .opt .logo-main .vaptcha-logo {\n\tdisplay: inline-block;\n\twidth: 14px;\n\theight: 16px;\n\tbackground: url(http://static.vaptcha.com/validate.png) 0 0px no-repeat;\n}\n\n.vaptcha .vaptcha-main .opt .logo-main span {\n\tmargin-left: -4px;\n}\n\n.vaptcha .vaptcha-main .opt .reload {\n\tfloat: right;\n}\n\n.vaptcha .vaptcha-main .opt .reload .refresh {\n\tdisplay: inline-block;\n\twidth: 16px;\n\theight: 16px;\n\tbackground: url(http://static.vaptcha.com/validate.png) no-repeat;\n\tbackground-position: 0 -57px;\n}\n\n.vaptcha .vaptcha-main .opt .reload .refresh:hover {\n\tbackground-position: 0 -73px;\n}\n\n.vaptcha .vaptcha-main .opt .draw {\n\twidth: 200px;\n\tmargin: 0 auto;\n\ttext-align: center;\n}\n\n.vaptcha .vaptcha-main .opt .draw .pencil {\n\tdisplay: inline-block;\n\twidth: 16px;\n\theight: 16px;\n\tbackground: url(http://static.vaptcha.com/validate.png) no-repeat;\n\tbackground-position: 0 -19px;\n}\n\n.vaptcha .vaptcha-main .opt .draw .pencil:hover {\n\tbackground-position: 0 -38px;\n}\n\n.vaptcha .vaptcha-main .opt .draw span {\n\tfont-size: 14px;\n\tcolor: #aaa;\n\tmargin: 0 10px;\n}\n\n.vaptcha .vaptcha-main .opt .draw .mouse img {\n\tvertical-align: text-bottom;\n}\n\n/*# sourceMappingURL=vaptcha.css.map */";
-        _insertStyle(styleText)
+    //生成Vaptcha
+    function _generateVaptchaImg() {
 
 
-        var poz = document.getElementById("vaptchaPoz");
-        poz.innerHTML = "";
-        var hideVaptcha = document.createElement("span");
-        hideVaptcha.innerHTML = "点击隐藏验证图片";
-        hideVaptcha.style.cssText = "width:496px;border:solid 1px #c4c3c3;background-color:#f9f9f9;color:#333;padding:11px 18px; border-radius:4px;font-size:2em;text-align:center;margin:20px 0px";
-        poz.appendChild(fragment);
-        poz.appendChild(hideVaptcha);
-
-
-        hideVaptcha.onclick = function () {
-            poz.innerHTML = "";
-            var showVaptcha = document.createElement("span");
-            showVaptcha.innerHTML = "点击显示验证图片";
-            showVaptcha.style.cssText = "width:496px;border:solid 1px #c4c3c3;background-color:#f9f9f9;color:#333;padding:11px 18px; border-radius:4px;font-size:2em;text-align:center;margin:20px 0px";
-            poz.appendChild(showVaptcha);
-            showVaptcha.onclick = function () {
-                var xhr = new XMLHttpRequest();
-                xhr.onreadystatechange = function () {
-                    if (xhr.readyState == 4) {
-                        if ((xhr.status >= 200 && xhr.status < 300) || xhr.status == 304) {
-                            var data = JSON.parse(xhr.response);
-                            console.log(xhr.responseText);
-                            vaptcha.getVaptcha(data.challenge, data.siteid, () => { });
-                        } else {
-                            console.error("Request was unsuccessful:" + xhr.status);
-                        }
-                    }
-                }
-                xhr.open("get", "./GetCaptcha", true);
-                xhr.send(null);
-            }
+        switch (vaptchaProduct) {
+            case "float": _generateFloatVaptcha();
+                break;
+            case "embed": _generateEmbedVaptcha();
+                break;
+            case "popup": _generatePopupVaptcha();
+                break;
+                defualt: _generateEmbedVaptcha();
+                break;
         }
+        vaptchaMessageDiv = document.getElementById("vaptchaOpt");
     }
     //向Vaptcha请求图片
-    function _getVaptcha(challengeParam, siteIdParam, fn) {
+    function _getVaptcha(challengeParam, siteIdParam) {
         requestAmount += 1;
-        getImgCallback = fn;
         challenge = challengeParam;
         siteId = siteIdParam;
         //vaptchaUrl + "/get?callback=Vaptcha" + new Date().getTime()
         _getJsonp(vaptchaUrl + "get?callback=Vaptcha" + new Date().getTime(), { "challenge": challengeParam, "siteId": siteIdParam }, "callback", function (data) {
-            //todo show img 或者 接收客户自定义function回调
             if (_detectResponse(data)) {
                 VaptchaData = data;
-                _generateVaptchaImg(data);
+                var img = document.getElementById("vaptchaImg")
+                img.setAttribute("src", imgUrl + VaptchaData.img);
                 _addEventHandler();
                 _refreshVaptchaOvertime();
-                if (typeof getImgCallback == "function") {
-                    getImgCallback(data);
-                }
             }
         })
     }
@@ -2039,13 +2122,11 @@
                 VaptchaData = data;
                 var img = document.getElementById("vaptchaImg")
                 img.setAttribute("src", imgUrl + VaptchaData.img);
-                if (typeof getImgCallback == "function") {
-                    getImgCallback(data);
-                }
+                getReadyCallback();
             }
         })
     }
-    //超时自动刷新页面
+    //超时自动刷新图片
     function _refreshVaptchaOvertime() {
         if (requestAmount > 10 || VaptchaInterval > 5) {
             window.clearInterval(interval);
@@ -2060,44 +2141,44 @@
 
     }
 
+
     /*外部接口对象*/
     vaptcha = {
-        init: function (fn) {
+        init: function (options) {
             _H5SupportTest();
             _polyfill();
-            validateCallback = fn;
-            vaptchaMessageDiv = document.getElementById("vaptchaMessage");
-            var showVaptcha = document.getElementById("VaptchaShow");
-            _eventHandler(showVaptcha, "click", function () {
-                var xhr = new XMLHttpRequest();
-                xhr.onreadystatechange = function () {
-                    if (xhr.readyState == 4) {
-                        if ((xhr.status >= 200 && xhr.status < 300) || xhr.status == 304) {
-                            var data = JSON.parse(xhr.response);
-                            console.log(xhr.responseText);
-                            vaptcha.getVaptcha(data.challenge, data.siteid, () => { });
-                        } else {
-                            console.error("Request was unsuccessful:" + xhr.status);
-                        }
-                    }
-                }
-                xhr.open("get", "./GetCaptcha", true);
-                xhr.send(null);
-            });
-        },
-        getVaptcha: function (challenge, siteId, fn) {
-            if (challenge && challenge.toString().length) {
+
+            if (typeof options.onReady == "function") {
+                getReadyCallback = options.onReady;
+            }
+            if (typeof options.onRefresh == "function") {
+                refreshCallback = options.onRefresh;
+            }
+            if (typeof options.onSuccess == "function") {
+                validateSuccessCallback = options.onSuccess;
+            }
+            if (typeof options.onFail == "function") {
+                validateFailCallback = options.onFail;
+            }
+            if (typeof options.onError == "function") {
+                validateErrorCallback = options.onError;
+            }
+            if (options.product === "embed" || options.product === "float" || options.product === "popup") {
+                vaptchaProduct = options.product;
+            }
+
+            if (options.siteId && options.challenge) {
                 VaptchaInitTime = new Date().getTime;
                 VaptchaTime = new Date().getTime();
                 VaptchaInterval = 0;
-
                 _setCookie("VaptchaInitTime", VaptchaInitTime, new Date(VaptchaInitTime + 180000), "", vaptchaUrl, false);
-
-                _getVaptcha(challenge, siteId, fn);
+                _generateVaptchaImg();
+                _getVaptcha(options.challenge, options.siteId);
             } else {
-                alert("challenge不能为空");
+                //do nothing
             }
         }
     };
+
     window.vaptcha = vaptcha;
 })(window);
